@@ -13,7 +13,12 @@ namespace ReallyReallyStupidGame.Model
 		// Animation representing the player
 		public Animation PlayerAnimation;
 
-		public bool Active;
+		public bool Active
+		{
+			get{return active;}
+			set{active = value;}
+		
+		}
 
 		// Position of the Player relative to the upper left side of the screen
 		public Vector2 Position;
@@ -57,7 +62,7 @@ namespace ReallyReallyStupidGame.Model
 
 		// Draw the player
 		public void Draw(SpriteBatch spriteBatch)
-		{
+		{ 
 			PlayerAnimation.Draw(spriteBatch);
 		}
 
