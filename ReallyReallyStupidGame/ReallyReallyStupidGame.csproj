@@ -54,6 +54,8 @@
     <Compile Include="View\parallaxingbackground.cs" />
     <Compile Include="Model\Enemy.cs" />
     <Compile Include="Model\Projectile.cs" />
+    <Compile Include="Model\Bombs.cs" />
+    <Compile Include="Model\DeathRay.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Icon.png" />

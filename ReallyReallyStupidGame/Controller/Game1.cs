@@ -5,6 +5,8 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Storage;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Audio;
+using Microsoft.Xna.Framework.Media;
 using Microsoft.Xna.Framework.Input.Touch;
 using System.Collections.Generic;
 
@@ -51,9 +53,34 @@ namespace ReallyReallyStupidGame.Controller
 		Texture2D projectileTexture;
 		List<Projectile> projectiles;
 
+		Texture2D bombTexture;
+		List<Bomb> bombs;
+
+		// The rate of fire of the player laser
+		TimeSpan fireTimeBomb;
+		TimeSpan previousFireTimeBomb;
+
+		Texture2D rayTexture;
+		List<DeathRay> rays;
+
+		TimeSpan fireTimeRay;
+		TimeSpan previousFireTimeRay;
+
 		// The rate of fire of the player laser
 		TimeSpan fireTime;
 		TimeSpan previousFireTime;
+
+		Texture2D explosionTexture;
+		List<Animation> explosions;
+
+		SoundEffect laserSound;
+		SoundEffect explosionSound;
+		Song gameplayMusic;
+
+		//Number that holds the player score
+		int score;
+		// The font used to display UI elements
+		SpriteFont font;
 
 		public Game1 ()
 		{
@@ -97,6 +124,21 @@ namespace ReallyReallyStupidGame.Controller
 
 			// Set the laser to fire every quarter second
 			fireTime = TimeSpan.FromSeconds(.15f);
+
+			bombs = new List<Bomb>();
+
+			// Set the laser to fire every quarter second
+			fireTimeBomb = TimeSpan.FromSeconds(.45f);
+
+			rays = new List<DeathRay>();
+
+			// Set the laser to fire every quarter second
+			fireTimeRay = TimeSpan.FromSeconds(5f);
+
+			explosions = new List<Animation>();
+
+			//Set player's score to zero
+			score = 0;
 		}
 
 		/// <summary>
@@ -123,6 +165,25 @@ namespace ReallyReallyStupidGame.Controller
 
 			enemyTexture = Content.Load<Texture2D>("Animation/mineAnimation");
 			projectileTexture = Content.Load<Texture2D>("Texture/laser");
+
+			bombTexture = Content.Load<Texture2D>("Texture/Bombsprite");
+
+			rayTexture = Content.Load<Texture2D>("Texture/DeathRay");
+
+			explosionTexture = Content.Load<Texture2D>("Animation/explosion");
+
+			// Load the music
+			gameplayMusic = Content.Load<Song>("Sound/gameMusic");
+
+			// Load the laser and explosion sound effect
+			laserSound = Content.Load<SoundEffect>("Sound/laserFire");
+			explosionSound = Content.Load<SoundEffect>("Sound/explosion");
+
+			// Start the music right away
+			PlayMusic(gameplayMusic);
+
+			// Load the score font
+			font = Content.Load<SpriteFont>("Font/gameFont");
 		}
 
 		/// <summary>
@@ -163,8 +224,93 @@ namespace ReallyReallyStupidGame.Controller
 
 			// Update the projectiles
 			UpdateProjectiles();
+
+			// Update the bombs
+			UpdateBombs();
+
+			UpdateRays ();
+
+			// Update the explosions
+			UpdateExplosions(gameTime);
             
 			base.Update (gameTime);
+		}
+
+		private void UpdateRays()
+		{
+			// Update the Projectiles
+			for (int i = rays.Count - 1; i >= 0; i--) 
+			{
+				rays[i].Update();
+
+				if (rays[i].Active == false)
+				{
+					rays.RemoveAt(i);
+				} 
+			}
+		}
+
+		private void AddRay(Vector2 position)
+		{
+			DeathRay projectile = new DeathRay(); 
+			projectile.Initialize(GraphicsDevice.Viewport, rayTexture,position); 
+			rays.Add(projectile);
+		}
+
+		private void UpdateBombs()
+		{
+			// Update the Projectiles
+			for (int i = bombs.Count - 1; i >= 0; i--) 
+			{
+				bombs[i].Update();
+
+				if (bombs[i].Active == false)
+				{
+					bombs.RemoveAt(i);
+				} 
+			}
+		}
+
+		private void AddBomb(Vector2 position)
+		{
+			Bomb projectile = new Bomb(); 
+			projectile.Initialize(GraphicsDevice.Viewport, bombTexture,position); 
+			bombs.Add(projectile);
+		}
+
+
+		private void PlayMusic(Song song)
+		{
+			// Due to the way the MediaPlayer plays music,
+			// we have to catch the exception. Music will play when the game is not tethered
+			try
+			{
+				// Play the music
+				MediaPlayer.Play(song);
+
+				// Loop the currently playing song
+				MediaPlayer.IsRepeating = true;
+			}
+			catch { }
+		}
+
+		private void UpdateExplosions(GameTime gameTime)
+		{
+			for (int i = explosions.Count - 1; i >= 0; i--)
+			{
+				explosions[i].Update(gameTime);
+				if (explosions[i].Active == false)
+				{
+					explosions.RemoveAt(i);
+				}
+			}
+		}
+
+		private void AddExplosion(Vector2 position)
+		{
+			Animation explosion = new Animation();
+			explosion.Initialize(explosionTexture,position, 134, 134, 12, 45, Color.White, 1f,false);
+			explosions.Add(explosion);
 		}
 
 		private void UpdateProjectiles()
@@ -250,6 +396,59 @@ namespace ReallyReallyStupidGame.Controller
 					}
 				}
 			}
+
+			// Projectile vs Enemy Collision
+			for (int i = 0; i < bombs.Count; i++)
+			{
+				for (int j = 0; j < enemies.Count; j++)
+				{
+					// Create the rectangles we need to determine if we collided with each other
+					rectangle1 = new Rectangle((int)bombs[i].Position.X - 
+						bombs[i].Width / 2,(int)bombs[i].Position.Y - 
+						bombs[i].Height / 2,bombs[i].Width, bombs[i].Height);
+
+					rectangle2 = new Rectangle((int)enemies[j].Position.X - enemies[j].Width / 2,
+						(int)enemies[j].Position.Y - enemies[j].Height / 2,
+						enemies[j].Width, enemies[j].Height);
+
+					// Determine if the two objects collided with each other
+					if (rectangle1.Intersects(rectangle2))
+					{
+						enemies[j].Health -= bombs[i].Damage;
+						bombs[i].Active = false;
+					}
+				}
+			}
+
+			for (int i = 0; i < rays.Count; i++)
+			{
+				for (int j = 0; j < enemies.Count; j++)
+				{
+					// Create the rectangles we need to determine if we collided with each other
+					rectangle1 = new Rectangle((int)rays[i].Position.X - 
+						rays[i].Width / 2,(int)rays[i].Position.Y - 
+						rays[i].Height / 2,rays[i].Width, rays[i].Height);
+
+					rectangle2 = new Rectangle((int)enemies[j].Position.X - enemies[j].Width / 2,
+						(int)enemies[j].Position.Y - enemies[j].Height / 2,
+						enemies[j].Width, enemies[j].Height);
+
+					// Determine if the two objects collided with each other
+					if (rectangle1.Intersects(rectangle2))
+					{
+						enemies[j].Health -= rays[i].Damage;
+						rays [i].Health -= 10;
+						if(rays[i].Health <= 0)
+						{
+							rays[i].Active = false;
+
+						}
+
+
+
+					}
+				}
+			}
 		}
 
 		private void AddEnemy()
@@ -291,8 +490,20 @@ namespace ReallyReallyStupidGame.Controller
 
 				if (enemies[i].Active == false)
 				{
+					// If not active and health <= 0
+					if (enemies[i].Health <= 0)
+					{
+						// Add an explosion
+						AddExplosion(enemies[i].Position);
+						// Play the explosion sound
+						explosionSound.Play();
+						//Add to the player's score
+						score += enemies[i].Value;
+					}
 					enemies.RemoveAt(i);
 				} 
+
+
 			}
 		}
 
@@ -333,11 +544,51 @@ namespace ReallyReallyStupidGame.Controller
 			// Fire only every interval we set as the fireTime
 			if (gameTime.TotalGameTime - previousFireTime > fireTime)
 			{
-				// Reset our current time
-				previousFireTime = gameTime.TotalGameTime;
 
-				// Add the projectile, but add it to the front and center of the player
-				AddProjectile(player.Position + new Vector2(player.Width / 2, 0));
+				if(currentKeyboardState.IsKeyDown(Keys.B))
+				{
+					// Reset our current time
+					previousFireTime = gameTime.TotalGameTime;
+
+					// Add the projectile, but add it to the front and center of the player
+					AddProjectile(player.Position + new Vector2(player.Width / 2, 0));
+					// Play the laser sound
+					laserSound.Play();
+				}
+
+			}
+
+			// Fire only every interval we set as the fireTime
+			if (gameTime.TotalGameTime - previousFireTimeBomb > fireTimeBomb)
+			{
+				if(currentKeyboardState.IsKeyDown(Keys.A))
+				{
+					// Reset our current time
+					previousFireTimeBomb = gameTime.TotalGameTime;
+
+					// Add the projectile, but add it to the front and center of the player
+					AddBomb(player.Position + new Vector2(player.Width / 2, 0));
+				}
+			}
+
+			// Fire only every interval we set as the fireTime
+			if (gameTime.TotalGameTime - previousFireTimeRay > fireTimeRay)
+			{
+				if(currentKeyboardState.IsKeyDown(Keys.C))
+				{
+					// Reset our current time
+					previousFireTimeRay = gameTime.TotalGameTime;
+
+					// Add the projectile, but add it to the front and center of the player
+					AddRay(player.Position + new Vector2(player.Width / 2, 0));
+				}
+			}
+
+			// reset score if player health goes to zero
+			if (player.Health <= 0)
+			{
+				player.Health = 100;
+				score = 0;
 			}
 		}
 
@@ -374,11 +625,37 @@ namespace ReallyReallyStupidGame.Controller
 				projectiles[i].Draw(spriteBatch);
 			}
 
+			// Draw the bombs
+			for (int i = 0; i < bombs.Count; i++)
+			{
+				bombs[i].Draw(spriteBatch);
+			}
+
+			// Draw the bombs
+			for (int i = 0; i < rays.Count; i++)
+			{
+				rays[i].Draw(spriteBatch);
+			}
+
+
+			// Draw the explosions
+			for (int i = 0; i < explosions.Count; i++)
+			{
+				explosions[i].Draw(spriteBatch);
+			}
+
+			// Draw the score
+			spriteBatch.DrawString(font, "score: " + score, new Vector2(GraphicsDevice.Viewport.TitleSafeArea.X, GraphicsDevice.Viewport.TitleSafeArea.Y), Color.White);
+			// Draw the player health
+			spriteBatch.DrawString(font, "health: " + player.Health, new Vector2(GraphicsDevice.Viewport.TitleSafeArea.X, GraphicsDevice.Viewport.TitleSafeArea.Y + 30), Color.White);
+
 			// Draw the Player
 			player.Draw(spriteBatch);
 
 			// Stop drawing
 			spriteBatch.End();
+
+
 		}
 	}
 }
